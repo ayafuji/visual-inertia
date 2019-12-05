@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,15 +21,24 @@ const (
 	BUFSIZE = 1024
 )
 
-func getRandomInt(min, max int) int {
-	return rand.Intn(max - min) + min
-}
-
 var (
 	record = flag.Bool("record", false, "recoed sensor data")
 	play = flag.String("play", "", "play from record")
 	file *os.File
 )
+
+func getRandomInt(min, max int) int {
+	return rand.Intn(max - min) + min
+}
+
+func Print() error {
+	err := exec.Command("/usr/bin/osascript", "push_lcmd.scpt").Run()
+	if err != nil {
+		fmt.Printf("failed to exec print jobs %s\n", err)
+		return err
+	}
+	return nil
+}
 
 func main() {
 	flag.Parse()
@@ -80,7 +90,6 @@ func main() {
 		}()
 	}
 
-
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -95,17 +104,26 @@ func main() {
 					break
 				} else {
 					spl := strings.Split(str, ",")
-					if len(spl) < 2 {
+					if len(spl) < 5 {
 						return
 					}
 					sx, _ := strconv.ParseFloat(spl[0], 64)
 					sy, _ := strconv.ParseFloat(spl[1], 64)
+					sz, _ := strconv.ParseFloat(spl[2], 64)
+					is_drag := false
+					if spl[3] == "1" {
+						is_drag = true
+					}
 					// TODO: photoshop の描画領域に沿って、移動領域を決定できるようにする
 					// MEMO: 500 の部分はセンシとして考えられる
 					nx := int((1920/2) + (sx * 500))
 					ny := int((1080/2) + (-sy * 500))
-					robotgo.DragSmooth(nx, ny,  0.5)
-					fmt.Printf("to x: %d y: %d, sx: %f sy: %f\n", nx, ny, sx, sy)
+					if is_drag {
+						robotgo.DragSmooth(nx, ny,  0.5)
+					} else {
+						robotgo.MoveSmooth(nx, ny,  0.5)
+					}
+					fmt.Printf("to x: %d y: %d, sx: %f sy: %f sz: %f is_drag: %v \n", nx, ny, sx, sy, sz, is_drag)
 				}
 			}
 		}
