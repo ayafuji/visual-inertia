@@ -6,37 +6,31 @@ import (
 	"github.com/go-vgo/robotgo"
 	"github.com/hypebeast/go-osc/osc"
 	"io/ioutil"
-	"math/rand"
 	"net"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
+	"test-control-mouse/sensor-reciver/control"
+	"test-control-mouse/sensor-reciver/network"
 	"time"
 )
 
 const (
-	PORT = 32900
+	PORT         = 32900
 	DEFAULT_HOST = "0.0.0.0"
-	OSC_PORT = 32901
-	BUFSIZE = 1024
-	AS_BIN_PATH = "/usr/bin/osascript"
-	PRINT_SCRIPT_PATH = "as/print.scpt"
-	HAND_SCRIPT_PATH = "as/hand.scpt"
-	ERASER_SCRIPT_PATH = "as/eraser.scpt"
-	MERGE_SCRIPT_PATH = "as/merge.scpt"
-	SENSITIVE = 500
+	OSC_PORT     = 32901
+	SENSITIVE    = 500
 )
 
 const (
-	SX_INDEX = 0
-	SY_INDEX = 1
-	SZ_INDEX = 2
-	ERASER_INDEX = 3
-	HAND_INDEX = 4
-	MERGE_INDEX = 5
-	PRINT_INDEX = 6
+	SX_INDEX     = 0
+	SY_INDEX     = 1
+	SZ_INDEX     = 2
+	ERASER_INDEX = control.ERASER_INDEX // 3
+	HAND_INDEX   = control.HAND_INDEX   // 4
+	MERGE_INDEX  = control.MERGE_INDEX  // 5
+	PRINT_INDEX  = control.PRINT_INDEX  // 6
 )
 
 var (
@@ -45,46 +39,6 @@ var (
 	disableControl = flag.Bool("disable-control", false, "disable disableControl")
 	file           *os.File
 )
-
-func getRandomInt(min, max int) int {
-	return rand.Intn(max - min) + min
-}
-
-func Print() error {
-	err := exec.Command("/usr/bin/osascript", "push_lcmd.scpt").Run()
-	if err != nil {
-		fmt.Printf("failed to exec print jobs %s\n", err)
-		return err
-	}
-	return nil
-}
-
-func SendOSCFloat(client *osc.Client, value float32, path string) error {
-	message := osc.NewMessage(path)
-	message.Append(value)
-	if err := client.Send(message); err != nil {
-		return err
-	}
-	return nil
-}
-
-func SendOSCInt(client *osc.Client, value int32, path string) error {
-	message := osc.NewMessage(path)
-	message.Append(value)
-	if err := client.Send(message); err != nil {
-		return err
-	}
-	return nil
-}
-
-func SendOSCString(client *osc.Client, value string, path string) error {
-	message := osc.NewMessage(path)
-	message.Append(value)
-	if err := client.Send(message); err != nil {
-		return err
-	}
-	return nil
-}
 
 func main() {
 	flag.Parse()
@@ -164,6 +118,10 @@ func main() {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
+		controller := control.NewPCController()
+		if *disableControl {
+			controller.ToggleDisable()
+		}
 		fmt.Printf("start mouse disableControl loop\n")
 		width, height := robotgo.GetScreenSize()
 		prevTool := 0
@@ -185,62 +143,49 @@ func main() {
 					sx, _ := strconv.ParseFloat(spl[SX_INDEX], 64)
 					sy, _ := strconv.ParseFloat(spl[SY_INDEX], 64)
 					sz, _ := strconv.ParseFloat(spl[SZ_INDEX], 64)
-					eraser, _ := strconv.ParseInt(spl[ERASER_INDEX], 10,32)
-					hand, _ := strconv.ParseInt(spl[HAND_INDEX], 10,32)
-					merge, _ := strconv.ParseInt(spl[MERGE_INDEX], 10,32)
+					eraser, _ := strconv.ParseInt(spl[ERASER_INDEX], 10, 32)
+					hand, _ := strconv.ParseInt(spl[HAND_INDEX], 10, 32)
+					merge, _ := strconv.ParseInt(spl[MERGE_INDEX], 10, 32)
 					print, _ := strconv.ParseInt(spl[PRINT_INDEX], 10, 32)
 
 					// OSC data
-					SendOSCFloat(client, float32(sx), "/accell/x")
-					SendOSCFloat(client, float32(sy), "/accell/y")
-					SendOSCFloat(client, float32(sz), "/accell/z")
-					SendOSCInt(client, int32(eraser), "/eraser")
-					SendOSCInt(client, int32(hand), "/hand")
-					SendOSCInt(client, int32(merge), "/merge")
-					SendOSCInt(client, int32(print), "/print")
+					network.SendOSCFloat(client, float32(sx), "/accell/x")
+					network.SendOSCFloat(client, float32(sy), "/accell/y")
+					network.SendOSCFloat(client, float32(sz), "/accell/z")
+					network.SendOSCInt(client, int32(eraser), "/eraser")
+					network.SendOSCInt(client, int32(hand), "/hand")
+					network.SendOSCInt(client, int32(merge), "/merge")
+					network.SendOSCInt(client, int32(print), "/print")
 
 					//fmt.Printf("sx: %f sy: %f sz: %f eraser %d, hand: %d, merge: %d, print: %d: \n",  sx, sy, sz, eraser, hand, merge, print)
 
-					if !*disableControl {
-						// TODO: photoshop の描画領域に沿って、移動領域を決定できるようにする
-						// MEMO: 500 の部分はセンシとして考えられる
+					if print == 1 {
+						if err := controller.Print(); err != nil {
+							fmt.Printf("%s", err)
+						}
+					}
+					if merge == 1 {
+						if err := controller.Merge(); err != nil {
+							fmt.Printf("%s", err)
+						}
+					}
 
-						if print == 1 {
-							//TODO: consider this process is blocking
-							err := exec.Command(AS_BIN_PATH, PRINT_SCRIPT_PATH).Start()
-							if err != nil {
-								fmt.Printf("failed to exec print command %s\n", err)
-							}
+					if ERASER_INDEX != prevTool && eraser == 1 {
+						if err := controller.ChangeTool(ERASER_INDEX); err != nil {
+							fmt.Printf("%s", err)
 						}
-						if merge == 1 {
-							err := exec.Command(AS_BIN_PATH, MERGE_SCRIPT_PATH).Start()
-							if err != nil {
-								fmt.Printf("failed to exec merge command %s\n", err)
-							}
+					}
+					if HAND_INDEX != prevTool && hand == 1 {
+						if err := controller.ChangeTool(HAND_INDEX); err != nil {
+							fmt.Printf("%s", err)
 						}
-
-						if ERASER_INDEX != prevTool && eraser == 1 {
-							fmt.Println("change to ERASER tool")
-							// exec eraser script
-							err := exec.Command(AS_BIN_PATH, ERASER_SCRIPT_PATH).Run()
-							if err != nil {
-								fmt.Printf("failed to exec eraser command %s\n", err)
-							}
-						}
-						if HAND_INDEX != prevTool && hand == 1 {
-							fmt.Println("change to HAND tool")
-							err := exec.Command(AS_BIN_PATH, HAND_SCRIPT_PATH).Run()
-							if err != nil {
-								fmt.Printf("failed to exec hand command %s\n", err)
-							}
-						}
-						nx := int(float64(width/2) + (sx * SENSITIVE))
-						ny := int(float64(height/2) + (-sy * SENSITIVE))
-						if eraser == 1 || hand == 1 {
-							robotgo.DragSmooth(nx, ny,  0.5)
-						} else {
-							robotgo.MoveSmooth(nx, ny,  0.5)
-						}
+					}
+					nx := int(float64(width/2) + (sx * SENSITIVE))
+					ny := int(float64(height/2) + (-sy * SENSITIVE))
+					if eraser == 1 || hand == 1 {
+						controller.MouseDrag(nx, ny)
+					} else {
+						controller.MouseMove(nx, ny)
 					}
 
 					// keep previous state
