@@ -17,7 +17,7 @@ const (
 	HAND_INDEX         = 4
 	MERGE_INDEX        = 5
 	PRINT_INDEX        = 6
-	DRAWALABLE_MERGIN  = 50
+	DRAWALABLE_MERGIN  = 10
 )
 
 type PCController struct {
@@ -109,6 +109,7 @@ func (p *PCController) MouseMove(nx, ny int) {
 		nx < w-DRAWALABLE_MERGIN &&
 		ny > DRAWALABLE_MERGIN &&
 		ny < h-DRAWALABLE_MERGIN {
-		robotgo.MoveSmooth(nx, ny, 0.5)
+		robotgo.Move(nx, ny)
+		//robotgo.MoveSmooth(nx, ny, 0.5)
 	}
 }

@@ -126,6 +126,7 @@ func main() {
 		width, height := robotgo.GetScreenSize()
 		prevTool := 0
 		fmt.Printf("screen size: %d x %d \n", width, height)
+		network.SendOSCInt(client, int32(1), "/init")
 		for {
 			select {
 			case str := <-sensorDataCh:
