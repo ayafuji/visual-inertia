@@ -13,10 +13,16 @@ const (
 	HAND_SCRIPT_PATH   = "as/hand.scpt"
 	ERASER_SCRIPT_PATH = "as/eraser.scpt"
 	MERGE_SCRIPT_PATH  = "as/merge.scpt"
-	ERASER_INDEX       = 3
-	HAND_INDEX         = 4
-	MERGE_INDEX        = 5
-	PRINT_INDEX        = 6
+	AT_TIME = 0
+	SX_INDEX     = 1
+	SY_INDEX     = 2
+	SZ_INDEX     = 3
+	ERASER_INDEX       = 4
+	HAND_INDEX         = 5
+	MERGE_INDEX        = 6
+	PRINT_INDEX        = 7
+	UP_INDEX           = 8
+	DOWN_INDEX         = 9
 	DRAWALABLE_MERGIN  = 10
 )
 

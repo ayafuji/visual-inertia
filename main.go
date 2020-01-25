@@ -6,6 +6,7 @@ import (
 	"github.com/go-vgo/robotgo"
 	"github.com/hypebeast/go-osc/osc"
 	"io/ioutil"
+	"math"
 	"net"
 	"os"
 	"strconv"
@@ -21,16 +22,6 @@ const (
 	DEFAULT_HOST = "0.0.0.0"
 	OSC_PORT     = 32901
 	SENSITIVE    = 500
-)
-
-const (
-	SX_INDEX     = 0
-	SY_INDEX     = 1
-	SZ_INDEX     = 2
-	ERASER_INDEX = control.ERASER_INDEX // 3
-	HAND_INDEX   = control.HAND_INDEX   // 4
-	MERGE_INDEX  = control.MERGE_INDEX  // 5
-	PRINT_INDEX  = control.PRINT_INDEX  // 6
 )
 
 var (
@@ -76,7 +67,7 @@ func main() {
 			}
 			linedBuffer := strings.Split(string(bytes), "\n")
 			for _, line := range linedBuffer {
-				time.Sleep((1000 / 15) * time.Millisecond)
+				time.Sleep((1000 / 60) * time.Millisecond)
 				if line != "" {
 					sensorDataCh <- line
 				}
@@ -137,17 +128,20 @@ func main() {
 					break
 				} else {
 					spl := strings.Split(str, ",")
-					if len(spl) < 5 {
+					if len(spl) <  5 {
 						return
 					}
 					// sx, sy, sz, eraser, hand, merge, print
-					sx, _ := strconv.ParseFloat(spl[SX_INDEX], 64)
-					sy, _ := strconv.ParseFloat(spl[SY_INDEX], 64)
-					sz, _ := strconv.ParseFloat(spl[SZ_INDEX], 64)
-					eraser, _ := strconv.ParseInt(spl[ERASER_INDEX], 10, 32)
-					hand, _ := strconv.ParseInt(spl[HAND_INDEX], 10, 32)
-					merge, _ := strconv.ParseInt(spl[MERGE_INDEX], 10, 32)
-					print, _ := strconv.ParseInt(spl[PRINT_INDEX], 10, 32)
+					atTime, _ := strconv.ParseFloat(spl[control.AT_TIME], 64)
+					sx, _ := strconv.ParseFloat(spl[control.SX_INDEX], 64)
+					sy, _ := strconv.ParseFloat(spl[control.SY_INDEX], 64)
+					sz, _ := strconv.ParseFloat(spl[control.SZ_INDEX], 64)
+					eraser, _ := strconv.ParseInt(spl[control.ERASER_INDEX], 10, 32)
+					hand, _ := strconv.ParseInt(spl[control.HAND_INDEX], 10, 32)
+					merge, _ := strconv.ParseInt(spl[control.MERGE_INDEX], 10, 32)
+					print, _ := strconv.ParseInt(spl[control.PRINT_INDEX], 10, 32)
+					up, _ := strconv.ParseInt(spl[control.UP_INDEX], 10, 32)
+					down, _ := strconv.ParseInt(spl[control.DOWN_INDEX], 10, 32)
 
 					// OSC data
 					network.SendOSCFloat(client, float32(sx), "/accell/x")
@@ -157,8 +151,19 @@ func main() {
 					network.SendOSCInt(client, int32(hand), "/hand")
 					network.SendOSCInt(client, int32(merge), "/merge")
 					network.SendOSCInt(client, int32(print), "/print")
+					network.SendOSCInt(client, int32(up), "/up")
+					network.SendOSCInt(client, int32(down), "/down")
 
-					//fmt.Printf("sx: %f sy: %f sz: %f eraser %d, hand: %d, merge: %d, print: %d: \n",  sx, sy, sz, eraser, hand, merge, print)
+					cTimemill := time.Now().UTC().UnixNano() / int64(time.Millisecond)
+					diff := atTime - float64(cTimemill)
+
+					if math.Abs(diff) > 20 {
+						fmt.Printf("%f millisecond delayed data is ignored\n", diff)
+						continue
+					} else {
+						fmt.Printf("diff: %f before, sx: %f sy: %f sz: %f eraser %d, hand: %d, merge: %d, print: %d: up: %d, down: %d\n",  diff, sx, sy, sz, eraser, hand, merge, print, up, down)
+					}
+
 
 					if print == 1 {
 						if err := controller.Print(); err != nil {
@@ -171,13 +176,13 @@ func main() {
 						}
 					}
 
-					if ERASER_INDEX != prevTool && eraser == 1 {
-						if err := controller.ChangeTool(ERASER_INDEX); err != nil {
+					if control.ERASER_INDEX != prevTool && eraser == 1 {
+						if err := controller.ChangeTool(control.ERASER_INDEX); err != nil {
 							fmt.Printf("%s", err)
 						}
 					}
-					if HAND_INDEX != prevTool && hand == 1 {
-						if err := controller.ChangeTool(HAND_INDEX); err != nil {
+					if control.HAND_INDEX != prevTool && hand == 1 {
+						if err := controller.ChangeTool(control.HAND_INDEX); err != nil {
 							fmt.Printf("%s", err)
 						}
 					}
@@ -191,10 +196,10 @@ func main() {
 
 					// keep previous state
 					if eraser == 1 {
-						prevTool = ERASER_INDEX
+						prevTool = control.ERASER_INDEX
 					}
 					if hand == 1 {
-						prevTool = HAND_INDEX
+						prevTool = control.HAND_INDEX
 					}
 				}
 			}
