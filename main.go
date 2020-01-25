@@ -90,6 +90,7 @@ func main() {
 			conn, _ := net.ListenPacket("udp", fmt.Sprintf("%s:%d", DEFAULT_HOST, PORT))
 			defer conn.Close()
 			buffer := make([]byte, 1500)
+
 			fmt.Printf("sensor data recieve disableControl loop\n")
 			for {
 				length, addr, _ := conn.ReadFrom(buffer)
