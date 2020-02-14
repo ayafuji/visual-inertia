@@ -22,7 +22,7 @@ const (
 	OSC_PORT     = 32901
 	SENSITIVE    = 500
 
-	ALLOWED_DELAY = 1000
+	ALLOWED_DELAY = 3000
 )
 
 var (
