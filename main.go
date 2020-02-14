@@ -6,7 +6,6 @@ import (
 	"github.com/go-vgo/robotgo"
 	"github.com/hypebeast/go-osc/osc"
 	"io/ioutil"
-	"math"
 	"net"
 	"os"
 	"strconv"
@@ -22,6 +21,8 @@ const (
 	DEFAULT_HOST = "0.0.0.0"
 	OSC_PORT     = 32901
 	SENSITIVE    = 500
+
+	ALLOWED_DELAY = 1000
 )
 
 var (
@@ -60,18 +61,26 @@ func main() {
 
 	if *play != "" {
 		go func() {
-			fmt.Printf("play from record. %s\n", *play)
+
+			playStartTime := strings.Replace(*play, "data/", "", -1)
+			playStartTime = strings.Replace(playStartTime, ".log", "", -1)
+			//playStartTimeInt, err := strconv.ParseFloat(playStartTime, 32)
+
 			bytes, err := ioutil.ReadFile(*play)
 			if err != nil {
 				panic(err)
 			}
 			linedBuffer := strings.Split(string(bytes), "\n")
 			for _, line := range linedBuffer {
-				time.Sleep((1000 / 60) * time.Millisecond)
+				time.Sleep((1000 / 15) * time.Millisecond)
 				if line != "" {
+					spl := strings.Split(line, ",")
+					genTime, _ := strconv.ParseFloat(spl[0], 64)
+					genTime /= 1000
 					sensorDataCh <- line
 				}
 			}
+
 			sensorDataCh <- "done"
 		}()
 	} else {
@@ -140,9 +149,8 @@ func main() {
 					eraser, _ := strconv.ParseInt(spl[control.ERASER_INDEX], 10, 32)
 					hand, _ := strconv.ParseInt(spl[control.HAND_INDEX], 10, 32)
 					merge, _ := strconv.ParseInt(spl[control.MERGE_INDEX], 10, 32)
-					print, _ := strconv.ParseInt(spl[control.PRINT_INDEX], 10, 32)
-					up, _ := strconv.ParseInt(spl[control.UP_INDEX], 10, 32)
-					down, _ := strconv.ParseInt(spl[control.DOWN_INDEX], 10, 32)
+					ratio, _ := strconv.ParseInt(spl[control.RATIO_INDEX], 10, 32)
+					volume, _ := strconv.ParseInt(spl[control.VOLUME_INDEX], 10, 32)
 
 					// OSC data
 					network.SendOSCFloat(client, float32(sx), "/accell/x")
@@ -151,26 +159,24 @@ func main() {
 					network.SendOSCInt(client, int32(eraser), "/eraser")
 					network.SendOSCInt(client, int32(hand), "/hand")
 					network.SendOSCInt(client, int32(merge), "/merge")
-					network.SendOSCInt(client, int32(print), "/print")
-					network.SendOSCInt(client, int32(up), "/up")
-					network.SendOSCInt(client, int32(down), "/down")
+					//network.SendOSCInt(client, int32(print), "/print")
+					network.SendOSCInt(client, int32(volume), "/volume")
 
 					cTimemill := time.Now().UTC().UnixNano() / int64(time.Millisecond)
-					diff := atTime - float64(cTimemill)
+					diff := float64(cTimemill) - atTime
 
-					if math.Abs(diff) > 20 {
+					if diff > ALLOWED_DELAY && *play == "" {
 						fmt.Printf("%f millisecond delayed data is ignored\n", diff)
 						continue
 					} else {
-						fmt.Printf("diff: %f before, sx: %f sy: %f sz: %f eraser %d, hand: %d, merge: %d, print: %d: up: %d, down: %d\n",  diff, sx, sy, sz, eraser, hand, merge, print, up, down)
+						fmt.Printf("diff: %f before, sx: %f sy: %f sz: %f eraser %d, hand: %d, merge: %d, ratio: %d, volume: %d\n",  diff, sx, sy, sz, eraser, hand, merge, ratio, volume)
 					}
 
-
-					if print == 1 {
-						if err := controller.Print(); err != nil {
-							fmt.Printf("%s", err)
-						}
-					}
+					//if print == 1 {
+					//	if err := controller.Print(); err != nil {
+					//		fmt.Printf("%s", err)
+					//	}
+					//}
 					if merge == 1 {
 						if err := controller.Merge(); err != nil {
 							fmt.Printf("%s", err)
@@ -187,8 +193,11 @@ func main() {
 							fmt.Printf("%s", err)
 						}
 					}
-					nx := int(float64(width/2) + (sx * SENSITIVE))
-					ny := int(float64(height/2) + (-sy * SENSITIVE))
+
+					width = control.DRAWABLE_AREA_WIDTH
+					height = control.DRAWABLE_AREA_HEIGHT
+					nx := int(float64(width/2) + (sx * float64(ratio)))
+					ny := int(float64(height/2) + (-sy * float64(ratio)))
 					if eraser == 1 || hand == 1 {
 						controller.MouseDrag(nx, ny)
 					} else {
