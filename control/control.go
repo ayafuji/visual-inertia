@@ -96,14 +96,25 @@ func (p *PCController) MouseDrag(nx, ny int) {
 		return
 	}
 	x, y := robotgo.GetMousePos()
-	w, h := robotgo.GetScreenSize()
-	if math.Abs(float64(x-nx)) < 500 &&
-		math.Abs(float64(y-ny)) < 500 &&
-		nx > DRAWALABLE_MERGIN &&
-		nx < w-DRAWALABLE_MERGIN &&
-		ny > DRAWALABLE_MERGIN &&
-		ny < h-DRAWALABLE_MERGIN {
-		robotgo.DragSmooth(nx, ny, 0.5)
+	w, h := DRAWABLE_AREA_WIDTH, DRAWABLE_AREA_HEIGHT
+	if math.Abs(float64(x-nx)) < 10000 &&
+		math.Abs(float64(y-ny)) < 10000 { //&&
+		//nx > DRAWALABLE_MERGIN &&
+		//nx < w-DRAWALABLE_MERGIN &&
+		//ny > DRAWALABLE_MERGIN &&
+		//ny < h-DRAWALABLE_MERGIN {
+		rx := nx
+		ry := ny
+		if nx < DRAWALABLE_MERGIN {
+			rx = DRAWALABLE_MERGIN
+		} else if nx > w-DRAWALABLE_MERGIN {
+			rx = w-DRAWALABLE_MERGIN
+		} else if ny < DRAWALABLE_MERGIN {
+			ny = DRAWALABLE_MERGIN
+		} else if ny > h-DRAWALABLE_MERGIN {
+			ny = h-DRAWALABLE_MERGIN
+		}
+		robotgo.DragSmooth(rx, ry, 0.5)
 	} else {
 		fmt.Printf("invalid request, here is not drawalable %d, %d\n", nx, ny)
 	}
@@ -113,12 +124,19 @@ func (p *PCController) MouseMove(nx, ny int) {
 	if p.disable {
 		return
 	}
-	w, h := robotgo.GetScreenSize()
-	if nx > DRAWALABLE_MERGIN &&
-		nx < w-DRAWALABLE_MERGIN &&
-		ny > DRAWALABLE_MERGIN &&
-		ny < h-DRAWALABLE_MERGIN {
-		robotgo.Move(nx, ny)
-		//robotgo.MoveSmooth(nx, ny, 0.5)
+	w, h := DRAWABLE_AREA_WIDTH, DRAWABLE_AREA_HEIGHT
+
+	rx := nx
+	ry := ny
+	if nx < DRAWALABLE_MERGIN {
+		rx = DRAWALABLE_MERGIN
+	} else if nx > w-DRAWALABLE_MERGIN {
+		rx = w-DRAWALABLE_MERGIN
+	} else if ny < DRAWALABLE_MERGIN {
+		ny = DRAWALABLE_MERGIN
+	} else if ny > h-DRAWALABLE_MERGIN {
+		ny = h-DRAWALABLE_MERGIN
 	}
+
+	robotgo.Move(rx, ry)
 }

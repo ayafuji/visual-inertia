@@ -22,7 +22,7 @@ const (
 	OSC_PORT     = 32901
 	SENSITIVE    = 500
 
-	ALLOWED_DELAY = 3000
+	ALLOWED_DELAY = 100000
 )
 
 var (
@@ -93,7 +93,7 @@ func main() {
 					// Openエラー処理
 				}
 				defer file.Close()
-				fmt.Printf("record flag is enabled. %s", fileName)
+				fmt.Printf("record flag is enabled. %s\n", fileName)
 			}
 
 			conn, _ := net.ListenPacket("udp", fmt.Sprintf("%s:%d", DEFAULT_HOST, PORT))
