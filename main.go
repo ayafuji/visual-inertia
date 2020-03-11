@@ -13,6 +13,7 @@ import (
 	"sync"
 	"test-control-mouse/sensor-reciver/control"
 	"test-control-mouse/sensor-reciver/network"
+	"test-control-mouse/sensor-reciver/processing"
 	"time"
 )
 
@@ -120,6 +121,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		controller := control.NewPCController()
+		xyz := processing.NewXYZ()
 		if *disableControl {
 			controller.ToggleDisable()
 		}
@@ -128,6 +130,7 @@ func main() {
 		prevTool := 0
 		fmt.Printf("screen size: %d x %d \n", width, height)
 		network.SendOSCInt(client, int32(1), "/init")
+
 		for {
 			select {
 			case str := <-sensorDataCh:
@@ -138,7 +141,7 @@ func main() {
 					break
 				} else {
 					spl := strings.Split(str, ",")
-					if len(spl) <  5 {
+					if len(spl) < 5 {
 						return
 					}
 					// sx, sy, sz, eraser, hand, merge, print
@@ -146,6 +149,8 @@ func main() {
 					sx, _ := strconv.ParseFloat(spl[control.SX_INDEX], 64)
 					sy, _ := strconv.ParseFloat(spl[control.SY_INDEX], 64)
 					sz, _ := strconv.ParseFloat(spl[control.SZ_INDEX], 64)
+					xyz.AddData(sx, sy, sz)
+
 					eraser, _ := strconv.ParseInt(spl[control.ERASER_INDEX], 10, 32)
 					hand, _ := strconv.ParseInt(spl[control.HAND_INDEX], 10, 32)
 					merge, _ := strconv.ParseInt(spl[control.MERGE_INDEX], 10, 32)
@@ -153,9 +158,9 @@ func main() {
 					volume, _ := strconv.ParseInt(spl[control.VOLUME_INDEX], 10, 32)
 
 					// OSC data
-					network.SendOSCFloat(client, float32(sx), "/accell/x")
-					network.SendOSCFloat(client, float32(sy), "/accell/y")
-					network.SendOSCFloat(client, float32(sz), "/accell/z")
+					network.SendOSCFloat(client, float32(xyz.GetXAX()), "/accell/x")
+					network.SendOSCFloat(client, float32(xyz.GetYAX()), "/accell/y")
+					network.SendOSCFloat(client, float32(xyz.GetZAX()), "/accell/z")
 					network.SendOSCInt(client, int32(eraser), "/eraser")
 					network.SendOSCInt(client, int32(hand), "/hand")
 					network.SendOSCInt(client, int32(merge), "/merge")
@@ -169,7 +174,9 @@ func main() {
 						fmt.Printf("%f millisecond delayed data is ignored\n", diff)
 						continue
 					} else {
-						fmt.Printf("diff: %f before, sx: %f sy: %f sz: %f eraser %d, hand: %d, merge: %d, ratio: %d, volume: %d\n",  diff, sx, sy, sz, eraser, hand, merge, ratio, volume)
+						fmt.Print("----------------------------------\n")
+						fmt.Printf("moving average: %f, %f, %f, acceleration: %f, %f, %f \n", xyz.GetXMA(), xyz.GetYMA(), xyz.GetZMA(), xyz.GetXAX(), xyz.GetYAX(), xyz.GetZAX())
+						fmt.Printf("diff: %f before, sx: %f sy: %f sz: %f eraser %d, hand: %d, merge: %d, ratio: %d, volume: %d\n", diff, sx, sy, sz, eraser, hand, merge, ratio, volume)
 					}
 
 					//if print == 1 {
